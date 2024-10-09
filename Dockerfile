@@ -1,23 +1,18 @@
-# Use an official Python runtime as a parent image
+# Use Python 3.11.5 as the base image
 FROM python:3.11.5
 
 # Set the working directory in the container
-WORKDIR /app
+WORKDIR app
 
-# Copy the requirements file
-COPY requirements.txt .
+# Copy the current directory contents into the container at /usr/src/app
+COPY . .
 
-# Install the dependencies
+# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
-COPY app.py .
-COPY templates/ templates/
-COPY csv/ csv/
-COPY models/ models/
-
-# Expose the port
+# Make port 5000 available to the world outside this container
 EXPOSE 5000
 
-# Run the command to start the Flask app
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+# Run the Flask server when the container launches
+CMD ["python", "-u", "app.py"]
+
