@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crop Yield Prediction and Nutrient Recommendations</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .crop-result {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .crop-result h3 {
+            margin-top: 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Crop Yield Prediction and Nutrient Recommendations</h1>
+        <form id="predictionForm">
+            <label for="district">Select District:</label>
+            <select id="district" required>
+                <!-- Options will be populated by JavaScript -->
+            </select>
+
+            <label for="area">Enter Area (Hectare):</label>
+            <input type="number" id="area" min="0" required>
+
+            <label for="season">Select Season:</label>
+            <select id="season" required>
+                <option value="Kharif">Kharif</option>
+                <option value="Rabi">Rabi</option>
+            </select>
+
+            <label for="N">N (Nitrogen):</label>
+            <input type="number" id="N" required>
+
+            <label for="P2O5">P2O5 (Phosphorus):</label>
+            <input type="number" id="P2O5" required>
+
+            <label for="K2O">K2O (Potassium):</label>
+            <input type="number" id="K2O" required>
+
+            <button type="submit">Submit</button>
+        </form>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+    // List of districts
+    const districts = ['agra', 'aligarh', 'allahabad', 'ambedkar nagar', 'amethi', 'amroha', 'auraiya', 'azamgarh', 'baghpat', 'bahraich', 'ballia', 'balrampur', 'banda', 'barabanki', 'bareilly', 'basti', 'bijnor', 'budaun', 'bulandshahr', 'chandauli', 'chitrakoot', 'deoria', 'etah', 'etawah', 'faizabad', 'farrukhabad', 'fatehpur', 'firozabad', 'gautam buddha nagar', 'ghaziabad', 'ghazipur', 'gonda', 'gorakhpur', 'hamirpur', 'hapur', 'hardoi', 'hathras', 'jalaun', 'jaunpur', 'jhansi', 'kannauj', 'kanpur dehat', 'kanpur nagar', 'kasganj', 'kaushambi', 'kheri', 'kushi nagar', 'lalitpur', 'lucknow', 'maharajganj', 'mahoba', 'mainpuri', 'mathura', 'mau', 'meerut', 'mirzapur', 'moradabad', 'muzaffarnagar', 'pilibhit', 'pratapgarh', 'rae bareli', 'rampur', 'saharanpur', 'sambhal', 'sant kabeer nagar', 'sant ravidas nagar', 'shahjahanpur', 'shamli', 'shravasti', 'siddharth nagar', 'sitapur', 'sonbhadra', 'sultanpur', 'unnao', 'varanasi'];
+
+    // Populate district dropdown
+    const districtSelect = document.getElementById('district');
+    districts.forEach(district => {
+        const option = document.createElement('option');
+        option.value = district;
+        option.textContent = district.charAt(0).toUpperCase() + district.slice(1);
+        districtSelect.appendChild(option);
+    });
+
+    document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = {
+            District: document.getElementById('district').value.toLowerCase(),
+            'Area (Hectare)': parseFloat(document.getElementById('area').value),
+            Season: document.getElementById('season').value,
+            N: parseFloat(document.getElementById('N').value),
+            P2O5: parseFloat(document.getElementById('P2O5').value),
+            K2O: parseFloat(document.getElementById('K2O').value),
+            Start_Year: 2022,
+            Humidity_Sowing: 0,
+            Humidity_Full: 0,
+            Rainfall_Sowing: 0,
+            Rainfall_Full: 0,
+            Max_Temperature_Sowing: 0,
+            Max_Temperature_Full: 0,
+            Min_Temperature_Sowing: 0,
+            Min_Temperature_Full: 0
+        };
+
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const results = await response.json();
+            await displayResults(results, formData.District);
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('results').innerHTML = `<p>Error: ${error.message}</p>`;
+        }
+    });
+
+    async function displayResults(results, district) {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = '<h2>Top 3 Recommended Crops:</h2>';
+
+    for (const [crop, details] of Object.entries(results)) {
+        const cropDiv = document.createElement('div');
+        cropDiv.className = 'crop-result';
+
+        let yieldDifference = 'N/A';
+        if (details['Yield Difference'] !== undefined) {
+            yieldDifference = details['Yield Difference'].toFixed(2);
+        }
+
+        let nutrientRecommendations = '<li>No recommendations available</li>';
+        if (Array.isArray(details.Nutrient_Recommendations)) {
+            nutrientRecommendations = details.Nutrient_Recommendations.map(rec => `<li>${rec}</li>`).join('');
+        }
+
+        cropDiv.innerHTML = `
+            <h3>${crop.charAt(0).toUpperCase() + crop.slice(1)}</h3>
+            <p>Predicted Yield Difference: ${yieldDifference} Tonnes/Hectare</p>
+            <h4>Nutrient Recommendations:</h4>
+            <ul>
+                ${nutrientRecommendations}
+            </ul>
+            <canvas id="${crop}-chart"></canvas>
+        `;
+        resultsDiv.appendChild(cropDiv);
+
+        try {
+            const historicalData = await fetchHistoricalYield(district, crop);
+            createChart(crop, historicalData);
+        } catch (error) {
+            console.error(`Error fetching historical data for ${crop}:`, error);
+            document.getElementById(`${crop}-chart`).innerHTML = `<p>Error loading historical data: ${error.message}</p>`;
+        }
+    }
+}
+
+
+    async function fetchHistoricalYield(district, crop) {
+        const response = await fetch(`/historical_yield?district=${encodeURIComponent(district)}&crop=${encodeURIComponent(crop)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    function createChart(crop, data) {
+        const ctx = document.getElementById(`${crop}-chart`).getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.years,
+                datasets: [{
+                    label: 'Historical Yield',
+                    data: data.yields,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Yield (Tonnes/Hectare)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    </script>
+</body>
+</html>
